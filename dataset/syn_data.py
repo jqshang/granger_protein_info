@@ -1,38 +1,34 @@
 import numpy as np
 
 
-def generate_synthetic_protein_data(num_acids, num_steps, seed=42):
-    np.random.seed(seed)
+def generate_synthetic_protein_data(num_acids, num_steps, pairs, seed=42):
+    rng = np.random.default_rng(seed)
 
-    # List of amino acid identifiers
+    # amino acid labels
     amino_acids = [f"A{i}" for i in range(1, num_acids + 1)]
+    idx_map = {a: i for i, a in enumerate(amino_acids)}
 
-    # dependency pairs Ai -> Aj
-    pairs = [("A1", "A16"), ("A16", "A17"), ("A17", "A30"), ("A30", "A36"),
-             ("A30", "A16"), ("A36", "A50")]
+    valid_pairs = [(Ai, Aj) for (Ai, Aj) in pairs
+                   if Ai in idx_map and Aj in idx_map]
 
-    # amino acids affected by rules (targets only)
-    dependent_targets = {"A16", "A17", "A30", "A36", "A50"}
+    # ---- Step 1: random initialization for all acids and times ----
+    # positions: (T, N, 3), angles: (T, N, 2)
+    positions = rng.uniform(-1.0, 1.0, size=(num_steps, num_acids, 3))
+    angles = rng.uniform(-180.0, 180.0, size=(num_steps, num_acids, 2))
 
-    aa_to_idx = {aa: i for i, aa in enumerate(amino_acids)}
-
-    pos = np.random.uniform(-1, 1, size=(num_steps, num_acids, 3))
-    angles = np.random.uniform(-180, 180, size=(num_steps, num_acids, 2))
-
+    # ---- Step 2: apply dependency rules over time ----
     for t in range(num_steps - 1):
-        for Ai, Aj in pairs:
-            i = aa_to_idx[Ai]
-            j = aa_to_idx[Aj]
+        for Ai, Aj in valid_pairs:
+            i = idx_map[Ai]
+            j = idx_map[Aj]
 
-            Ai_prev_pos = pos[t, i]
-            Ai_prev_angles = angles[t, i]
-            Aj_prev_pos = pos[t, j]
-            Aj_prev_angles = angles[t, j]
+            # copy previous values (overwrite any random at t+1)
+            positions[t + 1, j, :] = positions[t, j, :]
+            angles[t + 1, j, :] = angles[t, j, :]
 
-            pos[t + 1, j] = Aj_prev_pos + Aj_prev_pos * np.sin(Ai_prev_pos)
-            angles[t + 1, j] = Aj_prev_angles - Ai_prev_angles
+            # apply update rule
+            positions[t + 1,
+                      j, :] += positions[t, j, :] * np.sin(positions[t, i, :])
+            angles[t + 1, j, :] -= angles[t, i, :]
 
-    pos_array = pos.reshape(num_steps, num_acids * 3)
-    angle_array = angles.reshape(num_steps, num_acids * 2)
-
-    return pos_array, angle_array, amino_acids, dependent_targets, pairs
+    return positions, angles, amino_acids
