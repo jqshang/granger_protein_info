@@ -1,37 +1,53 @@
 import numpy as np
 
 
-def generate_synthetic_protein_data(num_acids, num_steps, pairs, seed=42):
+def syn_data(num_acids, num_steps, pairs, version="v1", seed=42):
     np.random.seed(seed)
 
-    # amino acid labels
     amino_acids = [f"A{i}" for i in range(1, num_acids + 1)]
-    idx_map = {a: i for i, a in enumerate(amino_acids)}
 
-    valid_pairs = [(Ai, Aj) for (Ai, Aj) in pairs
-                   if Ai in idx_map and Aj in idx_map]
+    # ----- Step 1: random initialize everything -----
+    pos = np.random.uniform(-1, 1, size=(num_steps, num_acids, 3))
+    ang = np.random.uniform(-180, 180, size=(num_steps, num_acids, 2))
 
-    # ---- Step 1: random initialization for all acids and times ----
-    # positions: (T, N, 3), angles: (T, N, 2)
-    positions = np.random.uniform(-1.0, 1.0, size=(num_steps, num_acids, 3))
-    angles = np.random.uniform(-180.0, 180.0, size=(num_steps, num_acids, 2))
+    # helper: map acid → index
+    idx = {a: i for i, a in enumerate(amino_acids)}
 
-    # ---- Step 2: apply dependency rules over time ----
+    # ----- Step 2: apply chosen version -----
     for t in range(num_steps - 1):
-        for Ai, Aj in valid_pairs:
-            i = idx_map[Ai]
-            j = idx_map[Aj]
+        for Ai, Aj in pairs:
+            i = idx[Ai]
+            j = idx[Aj]
 
-            # copy previous values (overwrite any random at t+1)
-            positions[t + 1, j, :] = positions[t, j, :]
-            angles[t + 1, j, :] = angles[t, j, :]
+            Ai_pos = pos[t, i]
+            Ai_ang = ang[t, i]
+            Aj_pos_prev = pos[t, j]
+            Aj_ang_prev = ang[t, j]
 
-            # apply update rule
-            positions[t + 1,
-                      j, :] += positions[t, j, :] * np.sin(positions[t, i, :])
-            angles[t + 1, j, :] -= angles[t, i, :]
+            if version == "v1":
+                # copy previous
+                pos[t + 1, j] = Aj_pos_prev.copy()
+                ang[t + 1, j] = Aj_ang_prev.copy()
+                # update
+                pos[t + 1, j] += Aj_pos_prev * np.sin(Ai_pos)
+                ang[t + 1, j] -= Ai_ang
 
-    angles = np.clip(angles, -1e6, 1e6)
-    positions = np.clip(positions, -1e6, 1e6)
+            elif version == "v2":
+                # angles copy only
+                ang[t + 1, j] = Aj_ang_prev.copy()
+                # update
+                pos[t + 1, j] = Aj_pos_prev * np.sin(Ai_pos)
+                ang[t + 1, j] -= Ai_ang
 
-    return positions, angles, amino_acids
+            elif version == "v3":
+                # copy previous
+                pos[t + 1, j] = Aj_pos_prev.copy()
+                ang[t + 1, j] = Aj_ang_prev.copy()
+                # update
+                pos[t + 1, j] += np.sin(Ai_pos)
+                ang[t + 1, j] -= Ai_ang
+
+            else:
+                raise ValueError("version must be 'v1', 'v2', or 'v3'")
+
+    return pos, ang, amino_acids
