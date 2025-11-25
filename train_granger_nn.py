@@ -12,8 +12,8 @@ def _train_granger_net(X,
                        num_layers=2,
                        lr=1e-3,
                        n_epochs=500,
-                       lambda_v=1e-3,
-                       lambda_t=1e-3,
+                       lambda_v=1e-4,
+                       lambda_t=1e-4,
                        device="cpu"):
     """
     X: numpy array of shape (T, D) = (time, features)
