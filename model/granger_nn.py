@@ -4,7 +4,7 @@ import torch.nn as nn
 
 class MLP(nn.Module):
 
-    def __init__(self, input_dim, hidden_dim=64, num_layers=2):
+    def __init__(self, input_dim, hidden_dim=128, num_layers=4):
         super().__init__()
         layers = []
         d_in = input_dim
@@ -32,7 +32,7 @@ class GrangerNeuralNet(nn.Module):
       - one MLP per target dimension d
     """
 
-    def __init__(self, D, H, hidden_dim=64, num_layers=2, device="cpu"):
+    def __init__(self, D, H, hidden_dim=128, num_layers=4, device="cpu"):
         super().__init__()
         self.D = D
         self.H = H
