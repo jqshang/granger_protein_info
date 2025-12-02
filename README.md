@@ -1,4 +1,4 @@
-# Determine Protein Information Flow Via Granger  Causality Analysis
+# Determine Protein Information Flow Via Granger Causality Analysis
 
 ## Abstract
 
