@@ -1,5 +1,6 @@
 import networkx as nx
 from tqdm.auto import tqdm
+from collections import deque
 
 
 def dfs(DG, source, target):
@@ -18,13 +19,7 @@ def dfs(DG, source, target):
                 stack.append((nbr, new_path))
 
 
-def filter_paths(
-    DG,
-    amino_acids,
-    allosteric_sites,
-    active_sites,
-    dfs,
-):
+def filter_paths(DG, amino_acids, allosteric_sites, active_sites):
     name_to_idx = {name: i for i, name in enumerate(amino_acids)}
 
     allosteric_indices = {name: name_to_idx[name] for name in allosteric_sites}
@@ -60,6 +55,42 @@ def filter_paths(
 
     signaling_subgraph = DG.edge_subgraph(used_edges).copy()
     return paths_by_pair, signaling_subgraph
+
+
+def _reachable_from_sources(DG, sources):
+    visited = set(sources)
+    dq = deque(sources)
+
+    while dq:
+        u = dq.popleft()
+        for v in DG.successors(u):
+            if v not in visited:
+                visited.add(v)
+                dq.append(v)
+
+    return visited
+
+
+def filter_paths_new(DG, amino_acids, allosteric_sites, active_sites):
+    name_to_idx = {name: i for i, name in enumerate(amino_acids)}
+
+    allo_idx = [name_to_idx[name] for name in allosteric_sites]
+    active_idx = [name_to_idx[name] for name in active_sites]
+
+    forward = _reachable_from_sources(DG, allo_idx)
+
+    DG_rev = DG.reverse(copy=False)
+    backward = _reachable_from_sources(DG_rev, active_idx)
+
+    used_edges = set()
+    for u, v in DG.edges():
+        if (u in forward) and (v in backward):
+            used_edges.add((u, v))
+
+    signaling_subgraph = DG.edge_subgraph(used_edges).copy()
+    used_nodes = set(signaling_subgraph.nodes())
+
+    return signaling_subgraph, used_nodes, used_edges
 
 
 def build_scc_quotient_graph(DG, amino_acids):
