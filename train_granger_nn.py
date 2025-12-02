@@ -4,6 +4,7 @@ from dataset.util import create_lagged_data, flatten_coordinates
 from dataset.syn_data import generate_synthetic_protein_data
 from model.granger_nn import GrangerNeuralNet
 from model.util import coords_to_residue_scores, build_residue_adjacency, adjacency_to_digraph, plot_digraph
+from tqdm.auto import trange
 
 
 def _train_granger_net(
@@ -18,7 +19,7 @@ def _train_granger_net(
     device="cpu",
     batch_size=256,
 ):
-    X_torch = torch.from_numpy(X).float().to(device)  # (T, D)
+    X_torch = torch.from_numpy(X).float()  # (T, D) on CPU
     X_torch = X_torch.unsqueeze(0)  # (1, T, D)
 
     with torch.no_grad():
@@ -41,10 +42,11 @@ def _train_granger_net(
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     mse_loss = nn.MSELoss()
 
-    for epoch in range(n_epochs):
+    epoch_iter = trange(n_epochs, desc="Training Granger NN", leave=True)
+
+    for epoch in epoch_iter:
         model.train()
 
-        # random permutation of indices
         perm = torch.randperm(N)
 
         epoch_loss = 0.0
@@ -53,7 +55,6 @@ def _train_granger_net(
         for i in range(0, N, batch_size):
             idx = perm[i:i + batch_size]
 
-            # Move only this batch to GPU
             X_batch = X_lag[idx].to(device)
             Y_batch = Y[idx].to(device)
 
@@ -62,7 +63,6 @@ def _train_granger_net(
             Y_hat = model(X_batch)  # (batch, D)
             loss_mse = mse_loss(Y_hat, Y_batch)
 
-            # L1 penalties
             loss_sparse_v = model.v.abs().sum()
             loss_sparse_t = model.t.abs().sum()
             loss = loss_mse + lambda_v * loss_sparse_v + lambda_t * loss_sparse_t
@@ -73,12 +73,12 @@ def _train_granger_net(
             epoch_loss += loss_mse.item()
             num_batches += 1
 
-        if (epoch + 1) % 50 == 0:
-            avg_mse = epoch_loss / max(1, num_batches)
-            print(f"Epoch {epoch + 1}/{n_epochs} | "
-                  f"mean MSE: {avg_mse:.4f} | "
-                  f"L1_v: {(lambda_v * model.v.abs().sum()).item():.4f} | "
-                  f"L1_t: {(lambda_t * model.t.abs().sum()).item():.4f}")
+        avg_mse = epoch_loss / max(1, num_batches)
+        epoch_iter.set_postfix(
+            mse=f"{avg_mse:.4f}",
+            L1_v=f"{(lambda_v * model.v.abs().sum()).item():.4f}",
+            L1_t=f"{(lambda_t * model.t.abs().sum()).item():.4f}",
+        )
 
     S = model.granger_matrix(p=2)
     return model, S
