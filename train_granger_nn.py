@@ -18,7 +18,7 @@ def _train_granger_net(
     device="cpu",
     batch_size=256,
 ):
-    X_torch = torch.from_numpy(X).float()  # .to(device)  # (T, D)
+    X_torch = torch.from_numpy(X).float().to(device)  # (T, D)
     X_torch = X_torch.unsqueeze(0)  # (1, T, D)
 
     with torch.no_grad():
@@ -93,6 +93,7 @@ def train_granger_net(
     n_epochs=500,
     lambda_v=1e-3,
     lambda_t=1e-3,
+    batch_size=256,
 ):
     T, D, C = data.shape
 
@@ -110,6 +111,7 @@ def train_granger_net(
         lambda_v=lambda_v,
         lambda_t=lambda_t,
         device=device,
+        batch_size=batch_size,
     )
 
     S_res = coords_to_residue_scores(S, n_coords=C)
